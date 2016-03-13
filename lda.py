@@ -6,6 +6,7 @@ import numpy as np
 import random
 import codecs
 import os
+import ToolClass
 
 from collections import OrderedDict
 
@@ -40,14 +41,53 @@ beta = float(conf.get('model_args','beta'))
 iter_times = int(conf.get('model_args','iter_times'))
 top_words_num = int(conf.get('model_args','top_words_num'))
 
+
 #数据预处理
 def preprocessing():
     Consolelogger.debug('载入数据......')
     loggerInfo.debug('载入数据......')
     with codecs.open(trainfile,'r',encoding='utf-8') as f:
         docs = f.readlines()
+
     Consolelogger.debug('载入完成，准备生成字典对象和统计文本数据...')
-    dpre = DataPrePreocessing()
+    dpre = ToolClass.DataPreProcessing()
     items_idx = 0
     for line in docs:
         if line != '':
+        	tmp = line.strip().split()
+        	#print(len(tmp))
+        	#生成一个文档对象
+        	doc = ToolClass.Document()
+        	for item in tmp:
+        		if item in dpre.word2id:
+        			doc.words.append(dpre.word2id[item])
+        		else:
+        			dpre.word2id[item] = items_idx
+        			doc.words.append(items_idx)
+        			items_idx += 1
+        		# print(doc.words)
+        	doc.length = len(tmp)
+        	dpre.docs.append(doc)
+        else:
+        	pass
+    dpre.docs_count = len(dpre.docs)
+    dpre.words_count = len(dpre.word2id)
+    # print(dpre.word2id)
+    Consolelogger.info('共有%s个文档' % dpre.docs_count)
+    Consolelogger.info('共有%s个词' % dpre.words_count)
+    dpre.cachewordidmap()
+    Consolelogger.info('词与序号对应关系已保存到%s' % wordidmapfile)
+    loggerInfo.info('词与序号对应关系已保存到%s' % wordidmapfile)
+
+    return dpre
+
+def run():
+ 	dpre = preprocessing()
+ 	print(dpre)
+ 	lda = ToolClass.LDAModel(dpre)
+ 	print(lda)
+ 	
+if __name__ == '__main__':
+	run()
+
+
