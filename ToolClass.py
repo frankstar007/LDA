@@ -1,6 +1,8 @@
 import codecs
 import configparser
 import numpy as np
+import os
+import random
 
 from collections import OrderedDict
 
@@ -8,7 +10,7 @@ from collections import OrderedDict
 path = os.getcwd()
 #导入配置文件
 conf = configparser.ConfigParser()
-conf.read("setting.conf") 
+conf.read("setting.conf",encoding='utf-8')
 #文件路径
 trainfile = os.path.join(path,os.path.normpath(conf.get("filepath", "trainfile")))
 wordidmapfile = os.path.join(path,os.path.normpath(conf.get("filepath","wordidmapfile")))
@@ -42,7 +44,7 @@ class DataPreProcessing(object):
 		self.docs = []
 		self.word2id = OrderedDict()
 
-	def cachewordidmap(self,wordidmapfile):
+	def cachewordidmap(self):
 		with open(wordidmapfile,'w',encoding='utf-8') as f:
 			for word,id in self.word2id.items():
 				f.write(word + '\t' + str(id) + '\n')
@@ -60,32 +62,42 @@ class LDAModel(object):
 
 		self.wordidmapfile = wordidmapfile		#词对应ID文件
 		self.trainfile = trainfile				#分好词的文件
-        self.thetafile = thetafile				#文章-主题分布文件
-        self.phifile = phifile                  #词-主题分布文件
-        self.topNfile = topNfile                #每个主题词topN词文件
-        self.tassginfile = tassginfile 			#最后分派结果文件
-        self.paramfile = paramfile				#模型训练选择的参数文件
-        
-		
-        
-        
-        
-        
-        
-        
+		self.thetafile = thetafile				#文章-主题分布文件
+		self.phifile = phifile                  #词-主题分布文件
+		self.topNfile = topNfile                #每个主题词topN词文件
+		self.tassginfile = tassginfile 			#最后分派结果文件
+		self.paramfile = paramfile				#模型训练选择的参数文件
 
-        self.p = np.zeros(self.K)				#p,概率向量存储采样的临时变量
-        self.nw = np.zeros((self.dpre.words_count,self.K),dtype='int')   #nw,词word在主题topic上的分布
-        self.nwsum = np.zeros(self.K,dtype='int')	#nwsum,每个topic上的分布
-        self.nd = np.zeros((self.dpre.docs_count,self.K),dtype='int')    #每个doc中各个topic的词的总数
-        self.ndsum = np.zeros(dpre.docs_count,dtype='int')	#每个doc中词的总数
-        self.Z = np.array([ [0 for y in xrange(dpre.docs[x].length)] for x in xrange(dpre.docs_count)])
+		self.p = np.zeros(self.K)				#p,概率向量存储采样的临时变量
+		self.nw = np.zeros((self.dpre.words_count,self.K),dtype='int')   #nw,词word在主题topic上的分布
+		self.nwsum = np.zeros(self.K,dtype='int')	#nwsum,每个topic上的分布
+		self.nd = np.zeros((self.dpre.docs_count,self.K),dtype='int')    #每个doc中各个topic的词的总数
+		self.ndsum = np.zeros(dpre.docs_count,dtype='int')	#每个doc中词的总数
+		self.Z = np.array([ [0 for y in range(dpre.docs[x].length)] for x in range(dpre.docs_count)])
+		#随机分配类型
+		for x in range(len(self.Z)):
+			self.ndsum[x] = self.dpre.docs[x].length
+			for y in range(self.dpre.docs[x].length):
+				topic = random.randint(0,self.K-1)
+				self.Z[x][y] = topic
+				self.nw[self.dpre.docs[x].words[y]][topic] += 1
+				self.nd[x][topic] += 1
+				self.nwsum[topic] += 1
 
-        #随机分配类型
-        for x in xrange(len(self.Z)):
-        	self.ndsum[x] = self.dpre.docs[x].length
+		self.theta = np.array([[0.0 for y in range(self.K)] for x in range(self.dpre.docs_count)])
+		self.phi = np.array([[0.0 for y in range(self.dpre.words_count)] for x in range(self.K)])
 
+	def sampling(self,i,j):
+		topic = self.Z[i][j]
+		word = self.dpre.docs[i].words[j]
+		self.nw[word][topic] -= 1
+		self.nd[i][topic] -= 1
+		self.nwsum[topic] -= 1
+		self.ndsum[i] -= 1
 
-		
-		
-		
+		Vbeta = self.dpre.words_count * self.beta
+		Kalpha = self.K * self.alpha
+		self.p = (self.nw[word] + self.beta)/(self.nwsum + Vbeta) * (self.nd[i] + self.alpha)/(self.ndsum[i] + Kalpha)
+		for k in range(1,self.K):
+			self.p[k] += self.p[k-1]
+		pass

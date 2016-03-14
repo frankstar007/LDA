@@ -83,9 +83,8 @@ def preprocessing():
 
 def run():
  	dpre = preprocessing()
- 	print(dpre)
  	lda = ToolClass.LDAModel(dpre)
- 	print(lda)
+ 	print(lda.Z)
  	
 if __name__ == '__main__':
 	run()
