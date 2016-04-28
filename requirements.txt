@@ -1,0 +1,4 @@
+jieba == 0.38
+configparser
+logging == 0.4.9.6
+numpy
